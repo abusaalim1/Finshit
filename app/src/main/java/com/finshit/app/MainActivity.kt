@@ -104,7 +104,8 @@ fun App(s: Store, onGoogle: () -> Unit) {
         ) {
             BackHandler(s.stack.size > 1 || s.tele != null) { if (s.tele != null) s.tele = null else s.back() }
             AnimatedContent(s.cur, transitionSpec = {
-                (fadeIn(tween(360, CubicBezierEasing(.22f, 1f, .36f, 1f))) + slideInVertically(tween(360, CubicBezierEasing(.22f, 1f, .36f, 1f))) { it / 28 }) togetherWith fadeOut(tween(160))
+                val ease = CubicBezierEasing(.22f, 1f, .36f, 1f)
+                (fadeIn(tween(360, easing = ease)) + slideInVertically(tween(360, easing = ease)) { it / 28 }) togetherWith fadeOut(tween(160))
             }, label = "screen") { c ->
                 when (c) {
                     Scr.Home -> HomeS(s); Scr.Projects -> ProjectsS(s); Scr.Tasks -> TasksS(s); Scr.Library -> LibraryS(s)
