@@ -1,6 +1,7 @@
 package com.finshit.app
 
 import androidx.compose.animation.core.*
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -122,7 +123,7 @@ fun Inp(v: String, c: (String) -> Unit, hint: String, m: Modifier = Modifier, on
 
 @Composable
 fun Empty(i: ImageVector, t: String, d: String, act: (@Composable () -> Unit)? = null) =
-    Column(Modifier.fillMaxWidth().padding(vertical = 26.dp, horizontal = 12.dp), Alignment.CenterHorizontally, Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 26.dp, horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         IcoBox(i, 56.dp, 26.dp, 20.dp); T(t, 15, FontWeight.Bold); Mu(d, center = true); act?.invoke()
     }
 
