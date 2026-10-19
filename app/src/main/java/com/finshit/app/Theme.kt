@@ -14,8 +14,9 @@ import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.addRoundRect
+import androidx.compose.ui.graphics.asFrameworkPaint
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -61,29 +62,30 @@ fun Modifier.glass(r: Dp = 24.dp): Modifier {
     val topHi = if (isDark) Color(0x14FFFFFF) else Color(0xE6FFFFFF)
     return this.drawBehind {
         val rr = r.toPx()
-        val rectF = android.graphics.RectF(0f, 0f, size.width, size.height)
         val interior = Path().apply {
             addRoundRect(RoundRect(Rect(0f, 0f, size.width, size.height), CornerRadius(rr)))
         }
         drawIntoCanvas { canvas ->
             // --- outside-only soft shadow: main pass ---
-            val paint = android.graphics.Paint().apply {
-                color = android.graphics.Color.TRANSPARENT
-                setShadowLayer(24.dp.toPx(), 0f, 8.dp.toPx(), shColor.toArgb())
+            // NOTE: body must be opaque for setShadowLayer to cast; the interior is
+            // clipped out (ClipOp.Difference) so only the outside shadow remains visible.
+            val paint = Paint().apply {
+                color = Color.Black
+                asFrameworkPaint().setShadowLayer(24.dp.toPx(), 0f, 8.dp.toPx(), shColor.toArgb())
             }
             canvas.save()
             canvas.clipPath(interior, ClipOp.Difference)
-            canvas.nativeCanvas.drawRoundRect(rectF, rr, rr, paint)
+            canvas.drawRoundRect(0f, 0f, size.width, size.height, rr, rr, paint)
             canvas.restore()
             // --- light-theme second tiny pass: 0 1px 1px rgba(120,50,20,.04) ---
             if (shColor2.alpha > 0f) {
-                val paint2 = android.graphics.Paint().apply {
-                    color = android.graphics.Color.TRANSPARENT
-                    setShadowLayer(2.dp.toPx(), 0f, 1.dp.toPx(), shColor2.toArgb())
+                val paint2 = Paint().apply {
+                    color = Color.Black
+                    asFrameworkPaint().setShadowLayer(2.dp.toPx(), 0f, 1.dp.toPx(), shColor2.toArgb())
                 }
                 canvas.save()
                 canvas.clipPath(interior, ClipOp.Difference)
-                canvas.nativeCanvas.drawRoundRect(rectF, rr, rr, paint2)
+                canvas.drawRoundRect(0f, 0f, size.width, size.height, rr, rr, paint2)
                 canvas.restore()
             }
         }

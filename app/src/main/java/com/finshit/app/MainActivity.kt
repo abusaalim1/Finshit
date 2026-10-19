@@ -3,6 +3,7 @@ package com.finshit.app
 import android.os.Bundle
 import android.widget.Toast
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
@@ -52,7 +53,7 @@ class MainActivity : ComponentActivity() {
             // local persistence: load once, then autosave on any data change (debounced)
             LaunchedEffect(Unit) {
                 store.attach(ctx)
-                kotlinx.coroutines.flow.snapshotFlow {
+                snapshotFlow {
                     buildString {
                         append(store.projects.joinToString { "${it.id}|${it.name}|${it.type}|${it.s}|${it.fav}" }); append('#')
                         append(store.tasks.joinToString { "${it.id}|${it.t}|${it.d}" }); append('#')
