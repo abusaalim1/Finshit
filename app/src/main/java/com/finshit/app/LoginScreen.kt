@@ -123,7 +123,7 @@ private fun Scene4() {
             listOf("Idea", "Script", "Shoot", "Edit", "Thumb", "Live").forEachIndexed { n, l ->
                 val f = remember { Animatable(0f) }
                 LaunchedEffect(Unit) { delay(400L + n * 200); f.animateTo(1f, tween(300, easing = EaseX)) }
-                Column(Modifier.weight(1f), Alignment.CenterHorizontally) {
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).background(mu.copy(.22f))) {
                         Box(Modifier.fillMaxWidth(f.value).fillMaxHeight().background(Brush.horizontalGradient(listOf(Ac2, Ac))))
                     }
@@ -143,7 +143,7 @@ private fun Scene4() {
 @Composable
 private fun Cap(tag: String, problem: Boolean, h: String, p: String) {
     val mu = LocalPal.current.mu
-    Column(Modifier.padding(horizontal = 24.dp), Alignment.CenterHorizontally, Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.enter(rememberIn(100), 12f).clip(CircleShape).background(if (problem) mu.copy(.2f) else Ac.copy(.15f)).padding(12.dp, 5.dp)) { T(tag.uppercase(), 11, Bold, if (problem) mu else Ac) }
         Box(Modifier.enter(rememberIn(200), 12f)) { H(h, 27, center = true, m = Modifier.widthIn(max = 290.dp)) }
         Box(Modifier.enter(rememberIn(300), 12f)) { Mu(p, 14, center = true) }
@@ -152,7 +152,7 @@ private fun Cap(tag: String, problem: Boolean, h: String, p: String) {
 
 @Composable
 private fun Story(scene: Int) = Crossfade(scene, animationSpec = tween(300), label = "story") { s ->
-    Column(Modifier.fillMaxWidth(), Alignment.CenterHorizontally, Arrangement.spacedBy(20.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         when (s) { 0 -> Scene1(); 1 -> Scene2(); 2 -> Scene3(); else -> Scene4() }
         when (s) {
             0 -> Cap("The problem", true, "Your content is scattered.", "Scripts, footage, thumbnails — everywhere.")
