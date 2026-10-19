@@ -16,18 +16,26 @@ android {
     }
     buildFeatures { compose = true; buildConfig = true }
     signingConfigs {
-        // Stable project keystore (committed at repo root) — used for the release build so
-        // every build is signed with the same key (also the fingerprint registered in Firebase).
+        // Legacy debug keystore (kept for compatibility; no longer used for signing).
         create("stable") {
             storeFile = rootProject.file("debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // Proper release certificate (CN=Finshit, SHA-1 B6:F2:FE:65:4E:40:C1:80:2D:DE:08:20:92:CF:84:33:10:98:7A:C5).
+        // Keystore is restored from the RELEASE_KEYSTORE_B64 Actions secret before the build;
+        // its password comes from KEYSTORE_PASSWORD (repo secret FINSHIT_KEYSTORE_PASSWORD).
+        create("release") {
+            storeFile = rootProject.file("finshit-release.keystore")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
+            keyAlias = "finshit"
+            keyPassword = System.getenv("KEYSTORE_PASSWORD") ?: "android"
+        }
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("stable")
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
         }

@@ -71,11 +71,13 @@ jobs:
           echo "$OLD_KEYSTORE_B64" | base64 -d > ./debug.keystore
           echo "$RELEASE_KEYSTORE_B64" | base64 -d > ./finshit-release.keystore
           ls -la ./debug.keystore ./finshit-release.keystore
-          echo "Keystores restored from secrets (release cert reserved for a future flip; this build signs with debug.keystore)."
+          echo "Keystores restored from secrets. This build signs with the release cert (finshit-release.keystore)."
 
       - name: Print signing SHA-1 fingerprint
+        env:
+          FINSHIT_KEYSTORE_PASSWORD: ${{ secrets.FINSHIT_KEYSTORE_PASSWORD }}
         run: |
-          SHA1=$("$JAVA_HOME/bin/keytool" -list -v -keystore ./debug.keystore -storepass android -alias androiddebugkey | grep "SHA1:" | awk '{print $2}')
+          SHA1=$("$JAVA_HOME/bin/keytool" -list -v -keystore ./finshit-release.keystore -storepass "$FINSHIT_KEYSTORE_PASSWORD" -alias finshit | grep "SHA1:" | awk '{print $2}')
           echo "SHA-1: $SHA1"
           {
             echo "## :key: Debug signing key SHA-1"
@@ -88,10 +90,11 @@ jobs:
       - name: Build release APK
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3584m -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false"
+          KEYSTORE_PASSWORD: ${{ secrets.FINSHIT_KEYSTORE_PASSWORD }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           set -o pipefail
-          echo "Starting Gradle release build (signed with the repo's stable keystore)..."
+          echo "Starting Gradle release build (signed with the Finshit release certificate)..."
           gradle :app:assembleRelease --stacktrace --no-configuration-cache 2>&1 | tee gradle-build.log
 
       - name: Capture build failure details
@@ -163,6 +166,17 @@ jobs:
           fi
           if [ -x "$BT/apksigner" ]; then
             "$BT/apksigner" verify --print-certs --min-sdk-version 26 "$APK" 2>/dev/null | grep -E "Signer #1 certificate (SHA-256|SHA-1)" >> "$GITHUB_STEP_SUMMARY" || true
+            CERT_SHA1=$("$BT/apksigner" verify --print-certs --min-sdk-version 26 "$APK" 2>/dev/null | grep "Signer #1 certificate SHA-1" | awk '{print $5}')
+            EXPECTED_SHA1="B6:F2:FE:65:4E:40:C1:80:2D:DE:08:20:92:CF:84:33:10:98:7A:C5"
+            if [ "$CERT_SHA1" = "$EXPECTED_SHA1" ]; then
+              echo ":white_check_mark: APK signed with the Finshit release cert ($CERT_SHA1)." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo ":x: WRONG SIGNING CERT: $CERT_SHA1 (expected $EXPECTED_SHA1)" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          else
+            echo ":warning: apksigner not available at $BT - cert check skipped." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
@@ -226,14 +240,14 @@ jobs:
           ### Release APK Automated Build
 
           - **Build Type**: Non-debuggable release APK (fixes Play Protect warnings from debuggable builds)
-          - **Signed with**: the project's stable keystore from GitHub Actions secrets (same signing key as the previous release - installs over it, no uninstall needed)
+          - **Signed with**: Finshit's proper release certificate (SHA-1 `B6:F2:FE:65:4E:40:C1:80:2D:DE:08:20:92:CF:84:33:10:98:7A:C5`, registered in Firebase) — one-time uninstall + fresh install required since the signature changed
           - **Built by**: GitHub Actions
           - **Run Number**: ${{ github.run_number }}
           - **Run Attempt**: ${{ github.run_attempt }}
           - **Source Commit**: ${{ github.sha }}
           - **AI**: Real OpenRouter AI assistant (`nvidia/nemotron-3.5-super-vl`) enabled - key injected from secrets at build time
 
-          > **Notice**: This is a release build (`debuggable=false`) signed with Finshit's stable keystore. It is not a Play Store production release.
+          > **Notice**: This is a release build (`debuggable=false`) signed with Finshit's release certificate (registered in Firebase). The signature changed from earlier builds, so uninstall the old app first, then install fresh.
           >
           > **Auth**: Real Google sign-in is enabled (Firebase project finshit-app) - tap "Continue with Google" on the login screen.
           EOF

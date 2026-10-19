@@ -36,12 +36,10 @@ may still contain earlier keystore blobs — a full purge would need a history r
   `Config.PREVIEW_UI_ONLY = false`. "Continue with Google" now goes through Credential Manager >
   Firebase Auth for real. The Android OAuth client in `google-services.json` carries the stable keystore
   fingerprint, so no further console steps are needed for this key.
-- A future certificate flip to the proper release key is staged (`finshit-release.keystore` material
-  prepared in CI secrets; SHA-1 `B6:F2:FE:65:4E:40:C1:80:2D:DE:08:20:92:CF:84:33:10:98:7A:C5`
-  still needs to be added in Firebase Console before the flip).
+- Certificate flip DONE (2026-10-19 mega round): builds now sign with the proper release certificate\n  (`CN=Finshit`, SHA-1 `B6:F2:FE:65:4E:40:C1:80:2D:DE:08:20:92:CF:84:33:10:98:7A:C5`, registered in\n  Firebase Console). The keystore lives in GitHub Actions secrets (`RELEASE_KEYSTORE_B64`),\n  restored before each build. One-time uninstall + fresh install is needed on the device because\n  the signature changed from the old key.
 - Earlier history: preview mode (`PREVIEW_UI_ONLY = true`, fake 1.2s sign-in) was used until the
   Firebase Console steps were done (SHA-1 fingerprint added, Google provider enabled, Web client ID issued).
-- The current signing key fingerprint (old key, still active):
+- The old signing key fingerprint (superseded, kept for reference):
 
 ```
 SHA-1: 27:DC:E7:16:E2:97:27:5B:49:06:A0:55:D1:41:89:BD:E3:B4:51:F3
