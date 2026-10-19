@@ -3,11 +3,27 @@
 1. Open this folder in Android Studio (Koala or newer) and let Gradle sync.
 2. Fonts are bundled in app/src/main/res/font/ (Bricolage Grotesque Bold, DM Sans Regular/Bold).
 3. Run on a device or emulator (minSdk 26).
+4. For the in-app AI to work in local builds, set the `OPENROUTER_API_KEY` environment variable
+   before syncing (CI reads it from the GitHub Actions secret of the same name).
+
+**This repo is public.** Secrets (the OpenRouter AI key, signing keystores and their passwords)
+live in GitHub Actions secrets, never in code. CI restores the keystores from
+`OLD_KEYSTORE_B64` / `RELEASE_KEYSTORE_B64` before building. Note: old commits in git history
+may still contain earlier keystore blobs — a full purge would need a history rewrite.
+
+## Features
+- Projects with custom folders, custom pipeline stages, and project templates (Video Project, Podcast, Minimal)
+- Tasks: status (To do / Doing / Done), due dates, priorities, tags, subtasks, project links, filters, kanban board
+- Pages (notes): icons, sub-pages, templates (Video Script, Ideas, Meeting), teleprompter
+- Library (kind filters + custom folders), search, publish calendar, brand kit, storage view, settings
+- Local data persistence — everything survives app restarts
+- Real AI assistant powered by OpenRouter (`nvidia/nemotron-3.5-super-vl`): chat + in-editor writing help (hooks, polish, summarize)
+- Google sign-in via Firebase Auth; glassmorphism design, spring micro-animations
 
 ## Builds
-- CI builds the **release** variant (`:app:assembleRelease`) signed with the repo's committed stable keystore
-  (`debug.keystore`, same key registered in Firebase). The release build is `debuggable=false` so it does not
-  trigger Play Protect warnings the way debug builds do. Minification/shrinking stay OFF (no behavior drift).
+- CI builds the **release** variant (`:app:assembleRelease`) signed with the project's stable keystore.
+  The release build is `debuggable=false` so it does not trigger Play Protect warnings the way debug
+  builds do. Minification/shrinking stay OFF (no behavior drift).
 
 ## Firebase
 - Firebase project: **finshit-app** (`app/google-services.json`).
@@ -20,13 +36,25 @@
   `Config.PREVIEW_UI_ONLY = false`. "Continue with Google" now goes through Credential Manager >
   Firebase Auth for real. The Android OAuth client in `google-services.json` carries the stable keystore
   fingerprint, so no further console steps are needed for this key.
+- A future certificate flip to the proper release key is staged (`finshit-release.keystore` material
+  prepared in CI secrets; SHA-1 `B6:F2:FE:65:4E:40:C1:80:2D:DE:08:20:92:CF:84:33:10:98:7A:C5`
+  still needs to be added in Firebase Console before the flip).
 - Earlier history: preview mode (`PREVIEW_UI_ONLY = true`, fake 1.2s sign-in) was used until the
   Firebase Console steps were done (SHA-1 fingerprint added, Google provider enabled, Web client ID issued).
-- The debug APK is signed with this repo's committed stable key (`debug.keystore`, shared by CI and dev builds):
+- The current signing key fingerprint (old key, still active):
 
 ```
 SHA-1: 27:DC:E7:16:E2:97:27:5B:49:06:A0:55:D1:41:89:BD:E3:B4:51:F3
 ```
+
+## AI (OpenRouter)
+- The app talks to OpenRouter's chat completions API (`AiClient.kt`, model
+  `nvidia/nemotron-3.5-super-vl`) via `HttpURLConnection` — no new dependencies.
+- The API key is injected at build time into `BuildConfig.OPENROUTER_KEY` from the
+  `OPENROUTER_API_KEY` env var (CI reads the GitHub Actions secret). Builds without the key
+  show a friendly "AI key missing" message instead of crashing.
+- Note: client-side integration means the key is embedded in the APK at runtime by design;
+  it is never committed to the repo. Treat the APK as private-to-you.
 
 ## Local data
 - Projects, tasks, notes, files, calendar events, brand kit and settings are saved to `finshit-data.json`

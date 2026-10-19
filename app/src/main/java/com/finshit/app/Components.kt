@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 
 /** Spring press-scale + click, no ripple (iOS feel). */
 fun Modifier.tap(onClick: () -> Unit): Modifier = composed {
@@ -136,9 +138,9 @@ fun RowCard(icon: ImageVector, title: String, sub: String? = null, m: Modifier =
     }
 
 @Composable
-fun StageBar(cur: Int, h: Dp = 6.dp, onTap: ((Int) -> Unit)? = null) =
+fun StageBar(cur: Int, stages: List<String>, h: Dp = 6.dp, onTap: ((Int) -> Unit)? = null) =
     Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 4.dp), Arrangement.spacedBy(6.dp)) {
-        repeat(6) { i ->
+        repeat(stages.size.coerceAtLeast(1)) { i ->
             val c by animateColorAsState(if (i <= cur) Ac else LocalPal.current.mu.copy(.25f), label = "st")
             Box(Modifier.weight(1f).height(h).clip(CircleShape).background(c).then(if (onTap != null) Modifier.clickable { onTap(i) } else Modifier))
         }
@@ -146,6 +148,17 @@ fun StageBar(cur: Int, h: Dp = 6.dp, onTap: ((Int) -> Unit)? = null) =
 
 @Composable
 fun starIcon(fav: Boolean) = if (fav) Icons.Filled.Star else Icons.Outlined.StarBorder
+
+/** Staggered list entrance: fade + 14dp rise, Apple-like ease. One-shot, no loops. */
+fun Modifier.enterAnim(index: Int): Modifier = composed {
+    val a = remember { Animatable(0f) }
+    val dy = with(LocalDensity.current) { 14.dp.toPx() }
+    LaunchedEffect(Unit) {
+        delay((index * 40).coerceAtMost(320).toLong())
+        a.animateTo(1f, tween(420, easing = CubicBezierEasing(.22f, 1f, .36f, 1f)))
+    }
+    this.graphicsLayer { alpha = a.value; translationY = (1 - a.value) * dy }
+}
 
 @Composable
 fun <X> Grid2(items: List<X>, c: @Composable (X) -> Unit) =

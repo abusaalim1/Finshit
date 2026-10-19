@@ -7,5 +7,7 @@ local.properties
 *.orig
 *.rej
 .DS_Store
-# NOTE: debug.keystore is intentionally committed (stable debug signing key shared by CI + dev builds)
+# Signing keystores must NEVER be committed. CI restores them from
+# GitHub Actions secrets (OLD_KEYSTORE_B64 / RELEASE_KEYSTORE_B64).
+*.keystore
 gradle-build.log

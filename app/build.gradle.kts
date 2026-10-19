@@ -10,8 +10,11 @@ android {
     defaultConfig {
         applicationId = "finshit.app"
         minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "1.0"
+        // Injected from the OPENROUTER_API_KEY env var in CI (GitHub Actions secret) —
+        // the key never lives in the repo. Empty string when not provided.
+        buildConfigField("String", "OPENROUTER_KEY", "\"${System.getenv("OPENROUTER_API_KEY") ?: ""}\"")
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     signingConfigs {
         // Stable project keystore (committed at repo root) — used for the release build so
         // every build is signed with the same key (also the fingerprint registered in Firebase).

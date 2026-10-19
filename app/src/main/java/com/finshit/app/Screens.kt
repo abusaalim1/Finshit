@@ -17,23 +17,23 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextRangeimport androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.TextStyle as DTS
 import java.util.Locale
 
-val STG = listOf("Idea", "Script", "Shoot", "Edit", "Thumbnail", "Published")
-val FOL = listOf("Scripts", "Footage", "Edits", "Thumbnails", "Notes", "Published")
-val FIC get() = listOf(Icons.Outlined.Edit, Icons.Outlined.Videocam, Icons.Outlined.Videocam, Icons.Outlined.Image, Icons.Outlined.InsertDriveFile, Icons.Outlined.Check)
+val TST = listOf("To do", "Doing", "Done")
+val PRN = listOf("None", "Low", "Med", "High")
 fun fmt(b: Long) = if (b > 1_000_000) "%.1f MB".format(b / 1e6) else "${maxOf(1, (b / 1000).toInt())} KB"
+fun fmtDate(e: Long) = LocalDate.ofEpochDay(e).format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
 
 @Composable
 fun Page(content: @Composable ColumnScope.() -> Unit) =
@@ -56,22 +56,33 @@ fun Hdr(s: Store, title: String, right: @Composable () -> Unit = {}) =
 fun GlassBox(m: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) = Column(m.fillMaxWidth().glass().padding(16.dp), content = content)
 
 @Composable
-fun ProjRow(s: Store, p: Proj) = RowCard(Icons.Outlined.Folder, p.name, "${p.type} · ${STG[p.s]}", onClick = { s.go(Scr.Project(p.id)) }) {
+fun ProjRow(s: Store, p: Proj, m: Modifier = Modifier) = RowCard(Icons.Outlined.Folder, p.name, "${p.type} · ${s.stages.getOrNull(p.s) ?: ""}", m = m, onClick = { s.go(Scr.Project(p.id)) }) {
     Box(Modifier.clickable { p.fav = !p.fav }) { Ico(starIcon(p.fav), 20.dp, if (p.fav) Ac else LocalPal.current.mu) }
 }
 
 @Composable
-fun TaskRow(t: Task) {
+fun TaskRow(t: Task, onOpen: (() -> Unit)? = null, m: Modifier = Modifier) {
     val on = t.d
-    Row(Modifier.fillMaxWidth().padding(bottom = 10.dp).tap { t.d = !t.d }.glass().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(26.dp).clip(CircleShape).background(if (on) Ac else Color.Transparent).border(2.dp, Ac, CircleShape), Alignment.Center) { if (on) Ico(Icons.Outlined.Check, 14.dp, Color.White) }
-        Text(t.t, Modifier.weight(1f), color = LocalPal.current.tx.copy(if (on) .5f else 1f), fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = BodyF,
-            textDecoration = if (on) androidx.compose.ui.text.style.TextDecoration.LineThrough else null)
+    val meta = buildString {
+        if (t.status != 0) append(TST.getOrElse(t.status) { "" })
+        t.dueDay?.let { if (isNotEmpty()) append(" · "); append("Due ${fmtDate(it)}") }
+        if (t.priority > 0) { if (isNotEmpty()) append(" · "); append(PRN.getOrElse(t.priority) { "" }) }
+    }
+    Row(m.fillMaxWidth().padding(bottom = 10.dp).tap { onOpen?.invoke() ?: run { t.d = !t.d } }.glass().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(26.dp).clip(CircleShape).background(if (on) Ac else Color.Transparent).border(2.dp, Ac, CircleShape).tap { t.d = !t.d }, Alignment.Center) { if (on) Ico(Icons.Outlined.Check, 14.dp, Color.White) }
+        Column(Modifier.weight(1f)) {
+            Text(t.t, Modifier.fillMaxWidth(), color = LocalPal.current.tx.copy(if (on) .5f else 1f), fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = BodyF,
+                textDecoration = if (on) androidx.compose.ui.text.style.TextDecoration.LineThrough else null)
+            if (meta.isNotEmpty()) Mu(meta, 12, m = Modifier.padding(top = 3.dp))
+        }
     }
 }
 
 @Composable
-fun NoteRow(s: Store, n: Note) = RowCard(Icons.Outlined.Edit, n.title.ifBlank { "Untitled script" }, "Script", onClick = { s.go(Scr.Editor(n.id)) })
+fun NoteRow(s: Store, n: Note) = Row(Modifier.fillMaxWidth().padding(bottom = 10.dp).tap { s.go(Scr.Editor(n.id)) }.glass().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    T(n.icon, 20)
+    Column(Modifier.weight(1f)) { T(n.title.ifBlank { "Untitled script" }, 15, FontWeight.Bold, lines = 1); Mu("Page") }
+}
 
 @Composable
 fun FileCard(f: FileItem) {
@@ -106,22 +117,22 @@ fun HomeS(s: Store) {
         }
         Box(Modifier.fillMaxWidth().glass().background(Brush.linearGradient(listOf(Ac2.copy(.35f), Color.Transparent))).padding(16.dp)) {
             if (lp != null) Column {
-                Mu("Resume where you left"); H(lp.name, 22, m = Modifier.padding(top = 4.dp)); Mu("Stage · ${STG[lp.s]}")
-                StageBar(lp.s); Bt("Continue", Modifier.padding(top = 12.dp)) { s.go(Scr.Project(lp.id)) }
+                Mu("Resume where you left"); H(lp.name, 22, m = Modifier.padding(top = 4.dp)); Mu("Stage · ${s.stages.getOrNull(lp.s) ?: ""}")
+                StageBar(lp.s, s.stages); Bt("Continue", Modifier.padding(top = 12.dp)) { s.go(Scr.Project(lp.id)) }
             } else Empty(Icons.Outlined.Folder, "No active project", "Create a project to keep scripts, footage and thumbnails together.") { Bt("New project") { s.sheet = Sh.NewProj } }
         }
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), Arrangement.spacedBy(10.dp)) {
-            listOf("Projects" to s.projects.size, "Open tasks" to ot.size, "Files" to s.files.size).forEach { (l, n) ->
-                Column(Modifier.weight(1f).glass().padding(16.dp)) { H("$n", 26); Mu(l) }
+            listOf("Projects" to s.projects.size, "Open tasks" to ot.size, "Files" to s.files.size).forEachIndexed { i, (l, n) ->
+                Column(Modifier.weight(1f).enterAnim(i).glass().padding(16.dp)) { H("$n", 26); Mu(l) }
             }
         }
         Sec("Quick actions")
-        Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().enterAnim(0), Arrangement.spacedBy(12.dp)) {
             RowCard(Icons.Outlined.Add, "Project", m = Modifier.weight(1f), onClick = { s.sheet = Sh.NewProj })
-            RowCard(Icons.Outlined.FileUpload, "Import", m = Modifier.weight(1f), onClick = { s.sheet = Sh.Import(s.projects.lastOrNull()?.id, 0) })
+            RowCard(Icons.Outlined.FileUpload, "Import", m = Modifier.weight(1f), onClick = { s.sheet = Sh.Import(s.projects.lastOrNull()?.id, null) })
         }
-        Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
-            RowCard(Icons.Outlined.Edit, "Script", m = Modifier.weight(1f), onClick = { s.newNote() })
+        Row(Modifier.fillMaxWidth().enterAnim(1), Arrangement.spacedBy(12.dp)) {
+            RowCard(Icons.Outlined.Edit, "Script", m = Modifier.weight(1f), onClick = { s.sheet = Sh.NewNote(null) })
             RowCard(Icons.Outlined.AutoAwesome, "AI", m = Modifier.weight(1f), onClick = { s.go(Scr.AI) })
         }
         Sec("Today’s tasks")
@@ -134,7 +145,7 @@ fun HomeS(s: Store) {
 fun ProjectsS(s: Store) = Page {
     TopRow("Projects") { IBtn(Icons.Outlined.Add) { s.sheet = Sh.NewProj } }
     if (s.projects.isEmpty()) GlassBox { Empty(Icons.Outlined.Folder, "No projects yet", "Each project holds its scripts, footage, edits and thumbnails.") { Bt("Create project") { s.sheet = Sh.NewProj } } }
-    else s.projects.forEach { ProjRow(s, it) }
+    else s.projects.forEachIndexed { i, p -> ProjRow(s, p, m = Modifier.enterAnim(i)) }
 }
 
 @Composable
@@ -143,54 +154,103 @@ fun ProjectS(s: Store, id: Int) {
     Page {
         Hdr(s, p.name) { IBtn(Icons.Outlined.Star, if (p.fav) Ac else null) { p.fav = !p.fav } }
         GlassBox {
-            Mu("${p.type} · tap a stage to update"); StageBar(p.s, 10.dp) { p.s = it }
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Mu("Idea"); T(STG[p.s], 15, FontWeight.Bold, Ac); Mu("Published") }
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                Mu("${p.type} · tap a stage to update"); IBtn(Icons.Outlined.Tune, size = 36.dp) { s.sheet = Sh.Stages }
+            }
+            StageBar(p.s, s.stages, 10.dp) { p.s = it }
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Mu(s.stages.firstOrNull() ?: ""); T(s.stages.getOrNull(p.s) ?: "", 15, FontWeight.Bold, Ac); Mu(s.stages.lastOrNull() ?: "") }
         }
         Sec("Folders")
-        Grid2(FOL.indices.toList()) { i ->
-            val n = s.files.count { it.pid == id && it.fo == i } + if (i == 0) s.notes.count { it.pid == id } else 0
-            Column(Modifier.fillMaxWidth().tap { s.go(Scr.Folder(id, i)) }.glass().padding(16.dp)) {
-                IcoBox(FIC[i]); Spacer(Modifier.height(12.dp)); T(FOL[i], 15, FontWeight.Bold); Mu("$n items")
+        val tiles: List<FolderItem?> = p.folders.toList() + listOf(null)
+        Grid2(tiles) { f ->
+            if (f == null) Column(Modifier.fillMaxWidth().tap { s.sheet = Sh.FolderEdit(id, null) }.glass().padding(16.dp)) {
+                IcoBox(Icons.Outlined.Add); Spacer(Modifier.height(12.dp)); T("+ Folder", 15, FontWeight.Bold); Mu("Create new")
+            } else {
+                val n = s.files.count { it.pid == id && it.folderId == f.id }
+                Column(Modifier.fillMaxWidth().tap { s.go(Scr.Folder(id, f.id)) }.glass().padding(16.dp)) {
+                    IcoBox(Icons.Outlined.Folder); Spacer(Modifier.height(12.dp)); T(f.name, 15, FontWeight.Bold); Mu("$n items")
+                }
             }
         }
+        val unfiled = s.files.filter { it.pid == id && it.folderId == null }
+        if (unfiled.isNotEmpty()) { Sec("Unfiled"); Grid2(unfiled) { FileCard(it) } }
+        Sec("Notes")
+        s.notes.filter { it.pid == id && it.parentId == null }.forEach { NoteRow(s, it) }
+        Bt("+ New note", Modifier.fillMaxWidth().padding(top = 4.dp), ghost = true) { s.sheet = Sh.NewNote(id) }
         Bt("Delete project", Modifier.fillMaxWidth().padding(top = 18.dp), ghost = true) { s.delProject(id) }
     }
 }
 
 @Composable
-fun FolderS(s: Store, id: Int, i: Int) {
-    val fs = s.files.filter { it.pid == id && it.fo == i }
-    val ns = if (i == 0) s.notes.filter { it.pid == id } else emptyList()
+fun FolderS(s: Store, id: Int, folderId: Int) {
+    val f = s.foldersOf(id).firstOrNull { it.id == folderId }
+    val fs = s.files.filter { it.pid == id && it.folderId == folderId }
     Page {
-        Hdr(s, FOL[i]) { IBtn(Icons.Outlined.FileUpload) { s.sheet = Sh.Import(id, i) } }
-        if (i == 0) Bt("New script", Modifier.fillMaxWidth().padding(bottom = 14.dp)) { s.newNote(id) }
-        ns.forEach { NoteRow(s, it) }
+        Hdr(s, f?.name ?: "Folder") {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IBtn(Icons.Outlined.Edit) { s.sheet = Sh.FolderEdit(id, folderId) }
+                IBtn(Icons.Outlined.FileUpload) { s.sheet = Sh.Import(id, folderId) }
+            }
+        }
         if (fs.isNotEmpty()) Grid2(fs) { FileCard(it) }
-        else if (ns.isEmpty()) GlassBox { Empty(FIC[i], "Nothing here yet", "Import files from your gallery or file picker.") { Bt("Import files") { s.sheet = Sh.Import(id, i) } } }
+        else GlassBox { Empty(Icons.Outlined.Folder, "Nothing here yet", "Import files from your gallery or file picker.") { Bt("Import files") { s.sheet = Sh.Import(id, folderId) } } }
     }
 }
 
 @Composable
 fun TasksS(s: Store) {
     var tf by remember { mutableIntStateOf(0) }
-    val l = s.tasks.filter { if (tf == 0) !it.d else it.d }
+    val today = LocalDate.now().toEpochDay()
+    val names = listOf("All", "Today", "Overdue", "High", "Done")
+    val l = s.tasks.filter { t -> when (tf) {
+        1 -> t.dueDay == today && t.status != 2
+        2 -> t.dueDay != null && t.dueDay!! < today && t.status != 2
+        3 -> t.priority >= 2 && t.status != 2
+        4 -> t.status == 2
+        else -> true
+    } }
     Page {
         TopRow("Tasks") { IBtn(Icons.Outlined.Add) { s.sheet = Sh.NewTask } }
-        Seg(listOf("Open", "Done"), tf) { tf = it }
-        if (l.isEmpty()) GlassBox { Empty(Icons.Outlined.TaskAlt, if (tf == 0) "No open tasks" else "Nothing completed", "Plan your day, shoots and uploads here.") { if (tf == 0) Bt("Add task") { s.sheet = Sh.NewTask } } }
-        else l.forEach { TaskRow(it) }
+        Row(Modifier.horizontalScroll(rememberScrollState())) { names.forEachIndexed { i, x -> Chip(x, tf == i) { tf = i } } }
+        if (l.isEmpty()) GlassBox { Empty(Icons.Outlined.TaskAlt, "Nothing here", "Plan your day, shoots and uploads here.") { Bt("Add task") { s.sheet = Sh.NewTask } } }
+        else l.forEachIndexed { i, t -> TaskRow(t, onOpen = { s.sheet = Sh.TaskDetail(t.id) }, m = Modifier.enterAnim(i)) }
     }
 }
 
 @Composable
 fun LibraryS(s: Store) {
     var flt by remember { mutableStateOf("All") }
-    val fs = s.files.filter { flt == "All" || it.kind == flt }
+    var nf by remember { mutableStateOf(false) }
+    var nn by remember { mutableStateOf("") }
+    val fs = s.files.filter { (flt == "All" || it.kind == flt) && it.pid == null }
     Page {
-        TopRow("Library") { IBtn(Icons.Outlined.FileUpload) { s.sheet = Sh.Import(null, 0) } }
+        TopRow("Library") { IBtn(Icons.Outlined.FileUpload) { s.sheet = Sh.Import(null, null) } }
         Row(Modifier.horizontalScroll(rememberScrollState())) { listOf("All", "Video", "Image", "Audio", "Docs").forEach { Chip(it, flt == it) { flt = it } } }
-        if (fs.isEmpty()) GlassBox { Empty(Icons.Outlined.Image, "Library is empty", "Everything you import appears here, ready to search.") { Bt("Import files") { s.sheet = Sh.Import(null, 0) } } }
+        Sec("Folders")
+        Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+            s.libraryFolders.forEach { Chip(it.name, false) { s.go(Scr.LibraryFolder(it.id)) } }
+            Chip("+ New", false) { nf = true }
+        }
+        if (nf) Inp(nn, { nn = it }, "Folder name", onDone = { if (nn.isNotBlank()) s.addFolder(null, nn.trim()); nn = ""; nf = false })
+        Sec("All files")
+        if (fs.isEmpty()) GlassBox { Empty(Icons.Outlined.Image, "Library is empty", "Everything you import appears here, ready to search.") { Bt("Import files") { s.sheet = Sh.Import(null, null) } } }
         else Grid2(fs) { FileCard(it) }
+    }
+}
+
+@Composable
+fun LibraryFolderS(s: Store, folderId: Int) {
+    val f = s.libraryFolders.firstOrNull { it.id == folderId }
+    val fs = s.files.filter { it.pid == null && it.folderId == folderId }
+    Page {
+        Hdr(s, f?.name ?: "Folder") {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                IBtn(Icons.Outlined.Edit) { s.sheet = Sh.FolderEdit(null, folderId) }
+                IBtn(Icons.Outlined.FileUpload) { s.sheet = Sh.Import(null, folderId) }
+            }
+        }
+        if (fs.isNotEmpty()) Grid2(fs) { FileCard(it) }
+        else GlassBox { Empty(Icons.Outlined.Folder, "Nothing here yet", "Import files into this folder.") { Bt("Import files") { s.sheet = Sh.Import(null, folderId) } } }
     }
 }
 
@@ -277,16 +337,28 @@ fun CalS(s: Store) {
 
 @Composable
 fun BoardS(s: Store) = Page {
-    Hdr(s, "Pipeline")
+    Hdr(s, "Board")
     Row(Modifier.horizontalScroll(rememberScrollState()), Arrangement.spacedBy(12.dp)) {
-        STG.forEachIndexed { i, st ->
-            val l = s.projects.filter { it.s == i }
-            Column(Modifier.width(200.dp)) {
-                Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) { H(st, 14); Mu("${l.size}", 14) }
-                l.forEach { p ->
-                    RowCard(Icons.Outlined.Folder, p.name, p.type, onClick = { s.go(Scr.Project(p.id)) }) { if (i < 5) IBtn(Icons.Outlined.ChevronRight, size = 34.dp) { p.s = i + 1 } }
+        TST.forEachIndexed { st, name ->
+            val l = s.tasks.filter { it.status == st }
+            Column(Modifier.width(220.dp)) {
+                Row(Modifier.padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) { H(name, 14); Mu("${l.size}", 14) }
+                l.forEach { t ->
+                    val done = t.subs.count { it.d }
+                    val meta = buildString {
+                        t.dueDay?.let { append("Due ${fmtDate(it)}") }
+                        if (t.priority > 0) { if (isNotEmpty()) append(" · "); append(PRN.getOrElse(t.priority) { "" }) }
+                        if (t.subs.isNotEmpty()) { if (isNotEmpty()) append(" · "); append("$done/${t.subs.size} subtasks") }
+                    }
+                    GlassBox(Modifier.padding(bottom = 10.dp).tap { s.sheet = Sh.TaskDetail(t.id) }) {
+                        T(t.t.ifBlank { "Untitled" }, 14, FontWeight.Bold, lines = 2)
+                        if (meta.isNotEmpty()) Mu(meta, 12, m = Modifier.padding(top = 4.dp))
+                    }
                 }
                 if (l.isEmpty()) Box(Modifier.fillMaxWidth().border(1.5.dp, LocalPal.current.mu.copy(.6f), RoundedCornerShape(18.dp)).padding(18.dp), Alignment.Center) { Mu("Empty") }
+                Bt("+ Add", Modifier.fillMaxWidth().padding(top = 6.dp), ghost = true) {
+                    val nid = s.addTask("New task", st); s.sheet = Sh.TaskDetail(nid)
+                }
             }
         }
     }
@@ -312,7 +384,7 @@ fun BrandS(s: Store) {
         Spacer(Modifier.height(12.dp))
         GlassBox { H("Fonts", 17); Spacer(Modifier.height(12.dp)); Inp(s.brandFont, { s.brandFont = it }, "Heading and body fonts") }
         Spacer(Modifier.height(12.dp))
-        GlassBox { Empty(Icons.Outlined.Image, "No logo yet", "Import your logo and default intro or outro text.") { Bt("Import logo", ghost = true) { s.sheet = Sh.Import(null, 0) } } }
+        GlassBox { Empty(Icons.Outlined.Image, "No logo yet", "Import your logo and default intro or outro text.") { Bt("Import logo", ghost = true) { s.sheet = Sh.Import(null, null) } } }
     }
 }
 
@@ -323,8 +395,16 @@ fun StorageS(s: Store) {
         Hdr(s, "Storage")
         GlassBox { Mu("Used by Finshit"); H(fmt(t), 40) }
         Sec("By folder")
-        FOL.forEachIndexed { i, f ->
-            val z = s.files.filter { it.fo == i }.sumOf { it.size }
+        val rows = buildList {
+            s.projects.forEach { p ->
+                p.folders.forEach { f -> add("${p.name} / ${f.name}" to s.files.filter { it.pid == p.id && it.folderId == f.id }.sumOf { it.size }) }
+                val u = s.files.filter { it.pid == p.id && it.folderId == null }.sumOf { it.size }
+                if (u > 0 || p.folders.isEmpty()) add("${p.name} / Unfiled" to u)
+            }
+            s.libraryFolders.forEach { f -> add("Library / ${f.name}" to s.files.filter { it.pid == null && it.folderId == f.id }.sumOf { it.size }) }
+            add("Unfiled" to s.files.filter { it.pid == null && it.folderId == null }.sumOf { it.size })
+        }
+        rows.forEach { (f, z) ->
             val frac by androidx.compose.animation.core.animateFloatAsState(if (t > 0) z.toFloat() / t else 0f, label = "bar")
             Column(Modifier.fillMaxWidth().padding(bottom = 10.dp).glass().padding(14.dp)) {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { T(f, 15, FontWeight.Bold); Mu(fmt(z)) }
@@ -357,11 +437,28 @@ fun SettingsS(s: Store, sysDark: Boolean) {
     }
 }
 
+internal val AI_SYSTEM = "You are the in-app AI assistant inside Finshit, a workspace app for video creators. Help with scripts, hooks, titles, thumbnails, planning. Be concise and practical."
+
 @Composable
 fun AiS(s: Store) {
     val msgs = remember { mutableStateListOf<Pair<Boolean, String>>() }
     var txt by remember { mutableStateOf("") }
-    fun ask(t: String) { msgs.add(true to t); msgs.add(false to "AI replies appear here once an on-device model or your API key is connected in Settings."); txt = "" }
+    var sending by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    fun ask(t: String) {
+        if (sending) return
+        msgs.add(true to t); txt = ""; sending = true
+        scope.launch {
+            val r = AiClient.chat(listOf("system" to AI_SYSTEM, "user" to t))
+            msgs.add(false to r.getOrElse { AiClient.friendlyError(it) })
+            sending = false
+        }
+    }
+    val starters = mapOf(
+        "Hook ideas" to "Suggest 5 strong hook ideas for a video",
+        "Video titles" to "Suggest 5 clickable video titles",
+        "Script outline" to "Write a short script outline"
+    )
     Page {
         Hdr(s, "AI assistant")
         if (msgs.isEmpty()) Empty(Icons.Outlined.AutoAwesome, "Ask anything", "Titles, hooks, outlines and descriptions for your next video.")
@@ -370,7 +467,8 @@ fun AiS(s: Store) {
                 Box(Modifier.fillMaxWidth(.85f).then(if (u) Modifier.clip(RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp)).background(Ac) else Modifier.glass(20.dp)).padding(16.dp, 12.dp)) { T(t, 14, color = if (u) Color.White else null) }
             }
         }
-        Row(Modifier.padding(vertical = 10.dp).horizontalScroll(rememberScrollState())) { listOf("Title ideas", "Hook for intro", "Video outline", "Description + tags").forEach { Chip(it, false) { ask(it) } } }
+        if (sending) Mu("Thinking…", m = Modifier.padding(bottom = 10.dp))
+        Row(Modifier.padding(vertical = 10.dp).horizontalScroll(rememberScrollState())) { starters.forEach { (l, p) -> Chip(l, false) { ask(p) } } }
         Inp(txt, { txt = it }, "Message AI…", onDone = { if (txt.isNotBlank()) ask(txt.trim()) })
     }
 }
@@ -387,11 +485,26 @@ fun EditorS(s: Store, id: Int) {
     }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(20.dp, 10.dp, 20.dp, 130.dp)) {
-            Hdr(s, "Script") { IBtn(Icons.Outlined.Tv) { s.tele = id } }
-            BasicTextField(n.title, { n.title = it }, Modifier.fillMaxWidth().padding(vertical = 6.dp), textStyle = TextStyle(color = p.tx, fontSize = 28.sp, fontFamily = HeadF, fontWeight = FontWeight.Bold), cursorBrush = SolidColor(Ac),
-                decorationBox = { i -> if (n.title.isEmpty()) H("Untitled script", 28, p.mu); i() })
+            Hdr(s, "Script") {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IBtn(Icons.Outlined.AutoAwesome) { s.sheet = Sh.AiNote(n.id) }
+                    IBtn(Icons.Outlined.Tv) { s.tele = id }
+                }
+            }
+            n.parentId?.let { pidv ->
+                val par = s.notes.firstOrNull { it.id == pidv }
+                Mu("‹ " + (par?.title?.ifBlank { "Untitled" } ?: "Parent page"), m = Modifier.padding(bottom = 4.dp).tap { s.go(Scr.Editor(pidv)) })
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                T(n.icon, 28, m = Modifier.tap { s.sheet = Sh.IconPick(n.id) })
+                BasicTextField(n.title, { n.title = it }, Modifier.weight(1f).padding(vertical = 6.dp), textStyle = TextStyle(color = p.tx, fontSize = 28.sp, fontFamily = HeadF, fontWeight = FontWeight.Bold), cursorBrush = SolidColor(Ac),
+                    decorationBox = { i -> if (n.title.isEmpty()) H("Untitled script", 28, p.mu); i() })
+            }
             BasicTextField(tv, { tv = it; n.body = it.text }, Modifier.fillMaxWidth().heightIn(min = 400.dp), textStyle = TextStyle(color = p.tx, fontSize = 16.sp, lineHeight = 27.sp, fontFamily = BodyF), cursorBrush = SolidColor(Ac),
                 decorationBox = { i -> if (tv.text.isEmpty()) Mu("Start writing your script…", 16); i() })
+            val kids = s.notes.filter { it.parentId == n.id }
+            if (kids.isNotEmpty()) { Sec("Sub-pages"); kids.forEach { NoteRow(s, it) } }
+            Bt("+ Add sub-page", Modifier.fillMaxWidth().padding(top = 14.dp), ghost = true) { s.addSubPage(n) }
         }
         Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().imePadding().padding(14.dp, 0.dp, 14.dp, 16.dp).fillMaxWidth().glass().horizontalScroll(rememberScrollState()).padding(8.dp)) {
             listOf("H1" to "# ", "H2" to "## ", "Text" to "", "Quote" to "> ", "List" to "• ", "To-do" to "☐ ", "Divider" to "\n———\n").forEach { (l, x) -> Chip(l, false) { ins(x) } }

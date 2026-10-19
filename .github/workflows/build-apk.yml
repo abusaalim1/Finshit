@@ -61,46 +61,21 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Set up stable debug keystore
-        id: keystore
+      - name: Restore signing keystores from secrets
+        env:
+          OLD_KEYSTORE_B64: ${{ secrets.OLD_KEYSTORE_B64 }}
+          RELEASE_KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
         run: |
-          mkdir -p ~/.android
-          if [ -f ./debug.keystore ]; then
-            echo "Using committed stable debug.keystore from repo."
-            cp ./debug.keystore ~/.android/debug.keystore
-            echo "new_keystore=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "No committed keystore - generating a new stable one..."
-            "$JAVA_HOME/bin/keytool" -genkey -v \
-              -keystore ~/.android/debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-            cp ~/.android/debug.keystore ./debug.keystore
-            echo "new_keystore=true" >> "$GITHUB_OUTPUT"
-          fi
-
-          if [ ! -f ~/.android/debug.keystore ]; then
-            echo "Error: Failed to set up ~/.android/debug.keystore."
-            exit 1
-          fi
-          echo "Debug keystore ready (AGP signs debug builds from ~/.android/debug.keystore)."
-
-      - name: Upload new keystore as artifact
-        if: steps.keystore.outputs.new_keystore == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-keystore
-          path: ./debug.keystore
-          if-no-files-found: error
+          if [ -z "$OLD_KEYSTORE_B64" ]; then echo "Error: OLD_KEYSTORE_B64 secret missing."; exit 1; fi
+          if [ -z "$RELEASE_KEYSTORE_B64" ]; then echo "Error: RELEASE_KEYSTORE_B64 secret missing."; exit 1; fi
+          echo "$OLD_KEYSTORE_B64" | base64 -d > ./debug.keystore
+          echo "$RELEASE_KEYSTORE_B64" | base64 -d > ./finshit-release.keystore
+          ls -la ./debug.keystore ./finshit-release.keystore
+          echo "Keystores restored from secrets (release cert reserved for a future flip; this build signs with debug.keystore)."
 
       - name: Print signing SHA-1 fingerprint
         run: |
-          SHA1=$("$JAVA_HOME/bin/keytool" -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | grep "SHA1:" | awk '{print $2}')
+          SHA1=$("$JAVA_HOME/bin/keytool" -list -v -keystore ./debug.keystore -storepass android -alias androiddebugkey | grep "SHA1:" | awk '{print $2}')
           echo "SHA-1: $SHA1"
           {
             echo "## :key: Debug signing key SHA-1"
@@ -113,6 +88,7 @@ jobs:
       - name: Build release APK
         env:
           GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3584m -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false"
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           set -o pipefail
           echo "Starting Gradle release build (signed with the repo's stable keystore)..."
@@ -250,11 +226,12 @@ jobs:
           ### Release APK Automated Build
 
           - **Build Type**: Non-debuggable release APK (fixes Play Protect warnings from debuggable builds)
-          - **Signed with**: the project's stable debug.keystore (same signing key as the previous release - installs over it, no uninstall needed)
+          - **Signed with**: the project's stable keystore from GitHub Actions secrets (same signing key as the previous release - installs over it, no uninstall needed)
           - **Built by**: GitHub Actions
           - **Run Number**: ${{ github.run_number }}
           - **Run Attempt**: ${{ github.run_attempt }}
           - **Source Commit**: ${{ github.sha }}
+          - **AI**: Real OpenRouter AI assistant (`nvidia/nemotron-3.5-super-vl`) enabled - key injected from secrets at build time
 
           > **Notice**: This is a release build (`debuggable=false`) signed with Finshit's stable keystore. It is not a Play Store production release.
           >
