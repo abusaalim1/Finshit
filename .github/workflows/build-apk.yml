@@ -184,6 +184,21 @@ jobs:
           fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Verify OpenRouter key baked into APK
+        run: |
+          APK="app/build/outputs/apk/release/app-release.apk"
+          TMPD=$(mktemp -d)
+          unzip -o -q "$APK" "classes*.dex" -d "$TMPD"
+          # COUNT ONLY — never print matching dex strings (they contain key material).
+          COUNT=$(strings "$TMPD"/classes*.dex | grep -c "sk-or-v1" || true)
+          echo "openrouter_key_baked_count=$COUNT" | tee -a "$GITHUB_STEP_SUMMARY"
+          rm -rf "$TMPD"
+          if [ "$COUNT" -eq 0 ]; then
+            echo ":warning: OpenRouter key NOT found in APK dex — AI will show 'key missing' in this build." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo ":white_check_mark: OpenRouter key present in APK dex." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -250,6 +265,7 @@ jobs:
           - **Run Attempt**: ${{ github.run_attempt }}
           - **Source Commit**: ${{ github.sha }}
           - **AI**: Real OpenRouter AI assistant (`nvidia/nemotron-3.5-super-vl`) enabled - key injected from secrets at build time
+          - **Linked pages**: Obsidian-style `[[Page Title]]` links in pages, with Linked pages + Backlinks sections in the editor
 
           > **Notice**: This is a release build (`debuggable=false`) signed with Finshit's release certificate (registered in Firebase). The signature changed from earlier builds, so uninstall the old app first, then install fresh.
           >

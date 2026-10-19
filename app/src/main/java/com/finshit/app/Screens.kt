@@ -479,6 +479,8 @@ fun EditorS(s: Store, id: Int) {
     val n = s.notes.firstOrNull { it.id == id } ?: return
     val p = LocalPal.current
     var tv by remember { mutableStateOf(TextFieldValue(n.body, TextRange(n.body.length))) }
+    // Sheets (AI insert, link page) mutate n.body directly — sync the field back.
+    LaunchedEffect(n.body) { if (tv.text != n.body) tv = TextFieldValue(n.body, TextRange(n.body.length)) }
     fun ins(x: String) {
         val a = tv.selection.min; val b = tv.selection.max
         val t = tv.text.substring(0, a) + x + tv.text.substring(b)
@@ -488,6 +490,7 @@ fun EditorS(s: Store, id: Int) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(20.dp, 10.dp, 20.dp, 130.dp)) {
             Hdr(s, "Script") {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IBtn(Icons.Outlined.Link) { s.sheet = Sh.LinkPage(n.id) }
                     IBtn(Icons.Outlined.AutoAwesome) { s.sheet = Sh.AiNote(n.id) }
                     IBtn(Icons.Outlined.Tv) { s.tele = id }
                 }
@@ -503,6 +506,10 @@ fun EditorS(s: Store, id: Int) {
             }
             BasicTextField(tv, { tv = it; n.body = it.text }, Modifier.fillMaxWidth().heightIn(min = 400.dp), textStyle = TextStyle(color = p.tx, fontSize = 16.sp, lineHeight = 27.sp, fontFamily = BodyF), cursorBrush = SolidColor(Ac),
                 decorationBox = { i -> if (tv.text.isEmpty()) Mu("Start writing your script…", 16); i() })
+            val out = s.outgoingLinks(n)
+            if (out.isNotEmpty()) { Sec("Linked pages"); out.forEach { NoteRow(s, it) } }
+            val back = s.backlinks(n)
+            if (back.isNotEmpty()) { Sec("Backlinks"); back.forEach { NoteRow(s, it) } }
             val kids = s.notes.filter { it.parentId == n.id }
             if (kids.isNotEmpty()) { Sec("Sub-pages"); kids.forEach { NoteRow(s, it) } }
             Bt("+ Add sub-page", Modifier.fillMaxWidth().padding(top = 14.dp), ghost = true) { s.addSubPage(n) }

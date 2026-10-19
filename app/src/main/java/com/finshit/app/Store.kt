@@ -34,6 +34,7 @@ sealed class Sh {
     data class TaskDetail(val id: Int) : Sh()
     data class IconPick(val noteId: Int) : Sh()
     data class AiNote(val noteId: Int) : Sh()
+    data class LinkPage(val noteId: Int) : Sh()
 }
 
 class FolderItem(val id: Int, var name: String)
@@ -44,6 +45,30 @@ class Proj(val id: Int, val name: String, val type: String) {
 }
 
 class SubTask(var t: String, var d: Boolean)
+
+// Obsidian-style page links: [[Page Title]] in a note body. Derived, not stored.
+// Title match is case-insensitive; same-project notes win over global ones.
+private val LINK_RX = Regex("\\[\\[([^\\]]+)\\]\\]")
+
+fun Store.noteByTitle(title: String, preferPid: Int?): Note? {
+    val t = title.trim().lowercase()
+    if (t.isEmpty()) return null
+    val same = notes.filter { it.title.trim().lowercase() == t }
+    return same.firstOrNull { it.pid == preferPid } ?: same.firstOrNull()
+}
+
+fun Store.outgoingLinks(n: Note): List<Note> =
+    LINK_RX.findAll(n.body).map { it.groupValues[1] }
+        .mapNotNull { noteByTitle(it, n.pid) }
+        .filter { it.id != n.id }
+        .distinctBy { it.id }
+
+fun Store.backlinks(n: Note): List<Note> {
+    val t = n.title.trim().lowercase()
+    if (t.isEmpty()) return emptyList()
+    return notes.filter { it.id != n.id &&
+        LINK_RX.findAll(it.body).any { m -> m.groupValues[1].trim().lowercase() == t } }
+}
 
 class Task(val id: Int, title: String) {
     var t by mutableStateOf(title)

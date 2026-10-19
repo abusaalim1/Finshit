@@ -336,6 +336,24 @@ fun Sheets(s: Store) {
                         }
                     }
                 }
+                is Sh.LinkPage -> {
+                    val n = s.notes.firstOrNull { it.id == sh.noteId }
+                    if (n != null) Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+                        H("Link page", 19, m = Modifier.padding(bottom = 14.dp))
+                        val others = s.notes.filter { it.id != n.id }
+                        if (others.isEmpty()) Mu("No other pages yet.")
+                        others.forEach { o ->
+                            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp).tap {
+                                val link = "[[" + o.title.ifBlank { "Untitled" } + "]]"
+                                n.body = if (n.body.isBlank()) link else n.body.trimEnd() + "\n" + link
+                                s.sheet = null
+                            }.glass().padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                T(o.icon, 20)
+                                T(o.title.ifBlank { "Untitled" }, 15, FontWeight.Bold, lines = 1, m = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
             }
         }
     }
