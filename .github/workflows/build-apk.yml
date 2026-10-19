@@ -164,24 +164,18 @@ jobs:
           else
             echo ":warning: aapt2 not available at $AAPT - debuggable check skipped." | tee -a "$GITHUB_STEP_SUMMARY"
           fi
-          echo "== apksigner present? =="
-          ls -la "$BT/apksigner" || true
-          echo "== keytool printcert on APK (Owner/SHA1) =="
-          "$JAVA_HOME/bin/keytool" -printcert -jarfile "$APK" 2>&1 | grep -E "Owner:|SHA1:" || true
-          echo "== apksigner full cert output =="
-          "$BT/apksigner" verify --print-certs --min-sdk-version 26 "$APK" 2>&1 | head -16
+          APK_CERTS=$("$BT/apksigner" verify --print-certs --min-sdk-version 26 "$APK" 2>&1)
+          echo "$APK_CERTS" | head -6
+          echo "$APK_CERTS" | grep -E "Signer #1 certificate (SHA-256|SHA-1)" | tee -a "$GITHUB_STEP_SUMMARY" || true
           if [ -x "$BT/apksigner" ]; then
-            "$BT/apksigner" verify --print-certs --min-sdk-version 26 "$APK" 2>/dev/null | grep -E "Signer #1 certificate (SHA-256|SHA-1)" | tee -a "$GITHUB_STEP_SUMMARY" || true
-            CERT_SHA1=$("$JAVA_HOME/bin/keytool" -printcert -jarfile "$APK" 2>/dev/null | grep "SHA1:" | awk '{print $2}')
+            RAW=$(echo "$APK_CERTS" | grep "Signer #1 certificate SHA-1 digest" | awk '{print $6}')
+            CERT_SHA1=$(echo "$RAW" | sed 's/../&:/g;s/:$//' | tr 'a-f' 'A-F')
             EXPECTED_SHA1="B6:F2:FE:65:4E:40:C1:80:2D:DE:08:20:92:CF:84:33:10:98:7A:C5"
             echo "APK signer SHA-1: '$CERT_SHA1'" | tee -a "$GITHUB_STEP_SUMMARY"
             if [ "$CERT_SHA1" = "$EXPECTED_SHA1" ]; then
               echo ":white_check_mark: APK signed with the Finshit release cert." | tee -a "$GITHUB_STEP_SUMMARY"
             else
               echo ":x: WRONG SIGNING CERT (expected $EXPECTED_SHA1)" | tee -a "$GITHUB_STEP_SUMMARY"
-              echo '```text' >> "$GITHUB_STEP_SUMMARY"
-              "$JAVA_HOME/bin/keytool" -printcert -jarfile "$APK" 2>&1 | head -20 >> "$GITHUB_STEP_SUMMARY"
-              echo '```' >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi
           else
