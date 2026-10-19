@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.asFrameworkPaint
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.*
@@ -69,23 +69,24 @@ fun Modifier.glass(r: Dp = 24.dp): Modifier {
             // --- outside-only soft shadow: main pass ---
             // NOTE: body must be opaque for setShadowLayer to cast; the interior is
             // clipped out (ClipOp.Difference) so only the outside shadow remains visible.
-            val paint = Paint().apply {
-                color = Color.Black
-                asFrameworkPaint().setShadowLayer(24.dp.toPx(), 0f, 8.dp.toPx(), shColor.toArgb())
+            val rectF = android.graphics.RectF(0f, 0f, size.width, size.height)
+            val paint = android.graphics.Paint().apply {
+                color = android.graphics.Color.BLACK
+                setShadowLayer(24.dp.toPx(), 0f, 8.dp.toPx(), shColor.toArgb())
             }
             canvas.save()
             canvas.clipPath(interior, ClipOp.Difference)
-            canvas.drawRoundRect(0f, 0f, size.width, size.height, rr, rr, paint)
+            canvas.nativeCanvas.drawRoundRect(rectF, rr, rr, paint)
             canvas.restore()
             // --- light-theme second tiny pass: 0 1px 1px rgba(120,50,20,.04) ---
             if (shColor2.alpha > 0f) {
-                val paint2 = Paint().apply {
-                    color = Color.Black
-                    asFrameworkPaint().setShadowLayer(2.dp.toPx(), 0f, 1.dp.toPx(), shColor2.toArgb())
+                val paint2 = android.graphics.Paint().apply {
+                    color = android.graphics.Color.BLACK
+                    setShadowLayer(2.dp.toPx(), 0f, 1.dp.toPx(), shColor2.toArgb())
                 }
                 canvas.save()
                 canvas.clipPath(interior, ClipOp.Difference)
-                canvas.drawRoundRect(0f, 0f, size.width, size.height, rr, rr, paint2)
+                canvas.nativeCanvas.drawRoundRect(rectF, rr, rr, paint2)
                 canvas.restore()
             }
         }
