@@ -12,6 +12,23 @@ android {
         minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "1.0"
     }
     buildFeatures { compose = true }
+    signingConfigs {
+        // Stable project keystore (committed at repo root) — used for the release build so
+        // every build is signed with the same key (also the fingerprint registered in Firebase).
+        create("stable") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("stable")
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }

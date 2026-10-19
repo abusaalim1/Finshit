@@ -4,6 +4,11 @@
 2. Fonts are bundled in app/src/main/res/font/ (Bricolage Grotesque Bold, DM Sans Regular/Bold).
 3. Run on a device or emulator (minSdk 26).
 
+## Builds
+- CI builds the **release** variant (`:app:assembleRelease`) signed with the repo's committed stable keystore
+  (`debug.keystore`, same key registered in Firebase). The release build is `debuggable=false` so it does not
+  trigger Play Protect warnings the way debug builds do. Minification/shrinking stay OFF (no behavior drift).
+
 ## Firebase
 - Firebase project: **finshit-app** (`app/google-services.json`).
 - applicationId is **finshit.app** to match the registered Firebase app. Code namespace stays com.finshit.app (unchanged).
