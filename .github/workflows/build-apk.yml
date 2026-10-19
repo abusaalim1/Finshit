@@ -155,31 +155,35 @@ jobs:
           APK="app/build/outputs/apk/release/app-release.apk"
           if [ -x "$AAPT" ]; then
             if "$AAPT" dump xmltree "$APK" AndroidManifest.xml 2>/dev/null | grep -qi "debuggable"; then
-              echo ":x: debuggable flag found in manifest!" >> "$GITHUB_STEP_SUMMARY"
-              "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -i "debuggable" | head -3 >> "$GITHUB_STEP_SUMMARY" || true
+              echo ":x: debuggable flag found in manifest!" | tee -a "$GITHUB_STEP_SUMMARY"
+              "$AAPT" dump xmltree "$APK" AndroidManifest.xml | grep -i "debuggable" | head -3 | tee -a "$GITHUB_STEP_SUMMARY" || true
               exit 1
             else
-              echo ":white_check_mark: debuggable flag ABSENT from manifest (non-debuggable release build)." >> "$GITHUB_STEP_SUMMARY"
+              echo ":white_check_mark: debuggable flag ABSENT from manifest (non-debuggable release build)." | tee -a "$GITHUB_STEP_SUMMARY"
             fi
           else
-            echo ":warning: aapt2 not available at $AAPT - debuggable check skipped." >> "$GITHUB_STEP_SUMMARY"
+            echo ":warning: aapt2 not available at $AAPT - debuggable check skipped." | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+          echo "== apksigner present? =="
+          ls -la "$BT/apksigner" || true
+          echo "== keytool printcert on APK (Owner/SHA1) =="
+          "$JAVA_HOME/bin/keytool" -printcert -jarfile "$APK" 2>&1 | grep -E "Owner:|SHA1:" || true
           if [ -x "$BT/apksigner" ]; then
-            "$BT/apksigner" verify --print-certs --min-sdk-version 26 "$APK" 2>/dev/null | grep -E "Signer #1 certificate (SHA-256|SHA-1)" >> "$GITHUB_STEP_SUMMARY" || true
+            "$BT/apksigner" verify --print-certs --min-sdk-version 26 "$APK" 2>/dev/null | grep -E "Signer #1 certificate (SHA-256|SHA-1)" | tee -a "$GITHUB_STEP_SUMMARY" || true
             CERT_SHA1=$("$JAVA_HOME/bin/keytool" -printcert -jarfile "$APK" 2>/dev/null | grep "SHA1:" | awk '{print $2}')
             EXPECTED_SHA1="B6:F2:FE:65:4E:40:C1:80:2D:DE:08:20:92:CF:84:33:10:98:7A:C5"
-            echo "APK signer SHA-1: '$CERT_SHA1'" >> "$GITHUB_STEP_SUMMARY"
+            echo "APK signer SHA-1: '$CERT_SHA1'" | tee -a "$GITHUB_STEP_SUMMARY"
             if [ "$CERT_SHA1" = "$EXPECTED_SHA1" ]; then
-              echo ":white_check_mark: APK signed with the Finshit release cert." >> "$GITHUB_STEP_SUMMARY"
+              echo ":white_check_mark: APK signed with the Finshit release cert." | tee -a "$GITHUB_STEP_SUMMARY"
             else
-              echo ":x: WRONG SIGNING CERT (expected $EXPECTED_SHA1)" >> "$GITHUB_STEP_SUMMARY"
+              echo ":x: WRONG SIGNING CERT (expected $EXPECTED_SHA1)" | tee -a "$GITHUB_STEP_SUMMARY"
               echo '```text' >> "$GITHUB_STEP_SUMMARY"
               "$JAVA_HOME/bin/keytool" -printcert -jarfile "$APK" 2>&1 | head -20 >> "$GITHUB_STEP_SUMMARY"
               echo '```' >> "$GITHUB_STEP_SUMMARY"
               exit 1
             fi
           else
-            echo ":warning: apksigner not available at $BT - cert check skipped." >> "$GITHUB_STEP_SUMMARY"
+            echo ":warning: apksigner not available at $BT - cert check skipped." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
