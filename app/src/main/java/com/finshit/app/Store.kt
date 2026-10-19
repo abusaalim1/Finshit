@@ -62,6 +62,7 @@ fun Store.outgoingLinks(n: Note): List<Note> =
         .mapNotNull { noteByTitle(it, n.pid) }
         .filter { it.id != n.id }
         .distinctBy { it.id }
+        .toList()
 
 fun Store.backlinks(n: Note): List<Note> {
     val t = n.title.trim().lowercase()
