@@ -35,6 +35,7 @@ object AiClient {
             }
             val body = JSONObject().apply {
                 put("model", MODEL)
+                put("max_tokens", 1200)
                 put("messages", JSONArray(messages.map { (role, content) ->
                     JSONObject().put("role", role).put("content", content)
                 }))
@@ -59,7 +60,7 @@ object AiClient {
     fun friendlyError(e: Throwable): String = when {
         e.message?.contains("AI key missing") == true -> "AI key missing in this build — reinstall the latest release."
         e.message?.contains("HTTP 401") == true -> "AI service refused the key (401). The key may be invalid or revoked."
-        e.message?.contains("HTTP 402") == true -> "AI credits exhausted (402). Top up the OpenRouter account."
+        e.message?.contains("HTTP 402") == true -> "AI credits/limit khatm — OpenRouter account me credits check karo."
         e.message?.contains("HTTP 429") == true -> "AI is rate-limited right now (429). Try again in a minute."
         else -> "AI error: ${e.message?.take(160) ?: "unknown"}"
     }

@@ -6,7 +6,7 @@
 4. For the in-app AI to work in local builds, set the `OPENROUTER_API_KEY` environment variable
    before syncing (CI reads it from the GitHub Actions secret of the same name).
 
-**This repo is public.** Secrets (the OpenRouter AI key, signing keystores and their passwords)
+**This repo is private.** Secrets (the OpenRouter AI key, signing keystores and their passwords)
 live in GitHub Actions secrets, never in code. CI restores the keystores from
 `OLD_KEYSTORE_B64` / `RELEASE_KEYSTORE_B64` before building. Note: old commits in git history
 may still contain earlier keystore blobs — a full purge would need a history rewrite.
