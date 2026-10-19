@@ -99,7 +99,7 @@ fun Tabs(s: Store, m: Modifier) {
     val root = s.stack.first()
     @Composable fun Tab(sc: Scr, l: String, i: ImageVector) {
         val on = root == sc
-        Column(Modifier.width(58.dp).tap { s.root(sc) }, Alignment.CenterHorizontally, Arrangement.spacedBy(3.dp)) {
+        Column(Modifier.width(58.dp).tap { s.root(sc) }, verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Ico(i, 22.dp, if (on) Ac else LocalPal.current.mu); T(l, 10, FontWeight.Bold, if (on) Ac else LocalPal.current.mu)
         }
     }
