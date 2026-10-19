@@ -12,6 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.google.firebase.auth.FirebaseAuth
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 sealed class Scr {
@@ -53,6 +55,102 @@ class Store : ViewModel() {
     var launcher: ((Int?, Int) -> Unit)? = null
 
     val cur get() = stack.last()
+
+    // ---------------- local persistence (finshit-data.json in filesDir) ----------------
+    private var appCtx: Context? = null
+    private val dataFile get() = File(appCtx!!.filesDir, "finshit-data.json")
+
+    /** Call once from MainActivity. Loads saved state (defensive: corrupt file -> start fresh). */
+    fun attach(ctx: Context) {
+        if (appCtx != null) return
+        appCtx = ctx.applicationContext
+        load()
+    }
+
+    fun save() {
+        val ctx = appCtx ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val o = JSONObject()
+                o.put("uid", uid)
+                o.put("projects", JSONArray(projects.map { p ->
+                    JSONObject().put("id", p.id).put("name", p.name).put("type", p.type)
+                        .put("s", p.s).put("fav", p.fav)
+                }))
+                o.put("tasks", JSONArray(tasks.map { t ->
+                    JSONObject().put("id", t.id).put("t", t.t).put("d", t.d)
+                }))
+                o.put("notes", JSONArray(notes.map { n ->
+                    JSONObject().put("id", n.id).put("pid", if (n.pid == null) JSONObject.NULL else n.pid)
+                        .put("title", n.title).put("body", n.body)
+                }))
+                o.put("files", JSONArray(files.map { f ->
+                    JSONObject().put("id", f.id).put("name", f.name).put("size", f.size)
+                        .put("kind", f.kind).put("pid", if (f.pid == null) JSONObject.NULL else f.pid)
+                        .put("fo", f.fo).put("uri", f.uri.toString()).put("fav", f.fav)
+                }))
+                val ev = JSONObject()
+                events.forEach { (k, v) -> ev.put(k, JSONArray(v)) }
+                o.put("events", ev)
+                o.put("brandColors", JSONArray(brandColors.map { it.value.toLong() }))
+                o.put("brandFont", brandFont)
+                o.put("dark", if (dark == null) JSONObject.NULL else dark)
+                o.put("lock", lock)
+                o.put("linkOnly", linkOnly)
+                dataFile.writeText(o.toString())
+            }
+        }
+    }
+
+    private fun load() {
+        runCatching {
+            val f = dataFile
+            if (!f.exists()) return
+            val o = JSONObject(f.readText())
+            uid = o.optInt("uid", 1)
+            o.optJSONArray("projects")?.let { a ->
+                for (i in 0 until a.length()) { val p = a.getJSONObject(i)
+                    projects.add(Proj(p.getInt("id"), p.getString("name"), p.getString("type")).also {
+                        it.s = p.optInt("s", 0); it.fav = p.optBoolean("fav", false)
+                    }) }
+            }
+            o.optJSONArray("tasks")?.let { a ->
+                for (i in 0 until a.length()) { val t = a.getJSONObject(i)
+                    tasks.add(Task(t.getInt("id"), t.getString("t")).also { it.d = t.optBoolean("d", false) }) }
+            }
+            o.optJSONArray("notes")?.let { a ->
+                for (i in 0 until a.length()) { val n = a.getJSONObject(i)
+                    notes.add(Note(n.getInt("id"), if (n.isNull("pid")) null else n.getInt("pid")).also {
+                        it.title = n.optString("title", ""); it.body = n.optString("body", "")
+                    }) }
+            }
+            o.optJSONArray("files")?.let { a ->
+                for (i in 0 until a.length()) { val fi = a.getJSONObject(i)
+                    files.add(FileItem(fi.getInt("id"), fi.getString("name"), fi.getLong("size"), fi.getString("kind"),
+                        if (fi.isNull("pid")) null else fi.getInt("pid"), fi.optInt("fo", 0),
+                        Uri.parse(fi.getString("uri"))).also { it.fav = fi.optBoolean("fav", false) }) }
+            }
+            o.optJSONObject("events")?.let { ev ->
+                ev.keys().forEach { k ->
+                    val a = ev.getJSONArray(k)
+                    events[k] = List(a.length()) { i -> a.getString(i) }
+                }
+            }
+            o.optJSONArray("brandColors")?.let { a ->
+                for (i in 0 until a.length()) brandColors.add(Color(a.getLong(i).toULong()))
+            }
+            brandFont = o.optString("brandFont", "")
+            dark = if (o.isNull("dark")) null else o.optBoolean("dark", false)
+            lock = o.optBoolean("lock", false)
+            linkOnly = o.optBoolean("linkOnly", false)
+            // keep uid ahead of every restored id
+            val maxId = listOf(
+                projects.maxOfOrNull { it.id }, tasks.maxOfOrNull { it.id },
+                notes.maxOfOrNull { it.id }, files.maxOfOrNull { it.id }
+            ).filterNotNull().maxOrNull() ?: 0
+            if (uid <= maxId) uid = maxId + 1
+        }
+    }
     fun go(s: Scr) { stack.add(s) }
     fun back() { if (stack.size > 1) stack.removeAt(stack.lastIndex) }
     fun root(s: Scr) { stack.clear(); stack.add(s) }

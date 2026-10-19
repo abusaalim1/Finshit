@@ -61,12 +61,18 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Create temporary debug keystore
+      - name: Set up stable debug keystore
+        id: keystore
         run: |
-          if [ ! -f ./debug.keystore ]; then
-            echo "Creating temporary debug keystore..."
+          mkdir -p ~/.android
+          if [ -f ./debug.keystore ]; then
+            echo "Using committed stable debug.keystore from repo."
+            cp ./debug.keystore ~/.android/debug.keystore
+            echo "new_keystore=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No committed keystore - generating a new stable one..."
             "$JAVA_HOME/bin/keytool" -genkey -v \
-              -keystore ./debug.keystore \
+              -keystore ~/.android/debug.keystore \
               -storepass android \
               -alias androiddebugkey \
               -keypass android \
@@ -74,15 +80,35 @@ jobs:
               -keysize 2048 \
               -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
-          else
-            echo "./debug.keystore already exists."
+            cp ~/.android/debug.keystore ./debug.keystore
+            echo "new_keystore=true" >> "$GITHUB_OUTPUT"
           fi
 
-          if [ ! -f ./debug.keystore ]; then
-            echo "Error: Failed to create ./debug.keystore."
+          if [ ! -f ~/.android/debug.keystore ]; then
+            echo "Error: Failed to set up ~/.android/debug.keystore."
             exit 1
           fi
-          echo "Temporary debug keystore verified."
+          echo "Debug keystore ready (AGP signs debug builds from ~/.android/debug.keystore)."
+
+      - name: Upload new keystore as artifact
+        if: steps.keystore.outputs.new_keystore == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-keystore
+          path: ./debug.keystore
+          if-no-files-found: error
+
+      - name: Print signing SHA-1 fingerprint
+        run: |
+          SHA1=$("$JAVA_HOME/bin/keytool" -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | grep "SHA1:" | awk '{print $2}')
+          echo "SHA-1: $SHA1"
+          {
+            echo "## :key: Debug signing key SHA-1"
+            echo ""
+            echo "\`$SHA1\`"
+            echo ""
+            echo "Register this fingerprint in Firebase Console (Project settings > Android app > Add fingerprint) to enable Google sign-in."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build debug APK
         env:
@@ -215,7 +241,9 @@ jobs:
           - **Run Attempt**: ${{ github.run_attempt }}
           - **Source Commit**: ${{ github.sha }}
 
-          > **Notice**: This APK is intended for testing and development purposes only. It is not a Play Store production release and is signed only with a temporary debug keystore.
+          > **Notice**: This APK is intended for testing and development purposes only. It is not a Play Store production release and is signed with the project's stable debug keystore.
+          >
+          > **If you installed an earlier Finshit build**: uninstall the old APK first, then install this one (the signing key changed).
           EOF
           )
 

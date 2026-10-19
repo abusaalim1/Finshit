@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -48,6 +49,21 @@ class MainActivity : ComponentActivity() {
                 uris.forEach { store.addFile(ctx, it, pend.first, pend.second) }
             }
             store.launcher = { pid, fo -> pend = pid to fo; picker.launch(arrayOf("*/*")) }
+            // local persistence: load once, then autosave on any data change (debounced)
+            LaunchedEffect(Unit) {
+                store.attach(ctx)
+                kotlinx.coroutines.flow.snapshotFlow {
+                    buildString {
+                        append(store.projects.joinToString { "${it.id}|${it.name}|${it.type}|${it.s}|${it.fav}" }); append('#')
+                        append(store.tasks.joinToString { "${it.id}|${it.t}|${it.d}" }); append('#')
+                        append(store.notes.joinToString { "${it.id}|${it.pid}|${it.title}|${it.body}" }); append('#')
+                        append(store.files.joinToString { "${it.id}|${it.name}|${it.size}|${it.kind}|${it.pid}|${it.fo}|${it.uri}|${it.fav}" }); append('#')
+                        append(store.events.entries.joinToString { e -> e.key + "=" + e.value.joinToString(",") }); append('#')
+                        append(store.brandColors.joinToString { it.value.toString() }); append('#')
+                        append("${store.brandFont}|${store.dark}|${store.lock}|${store.linkOnly}")
+                    }
+                }.debounce(400).collect { store.save() }
+            }
             val scope = rememberCoroutineScope()
             val onGoogle: () -> Unit = {
                 scope.launch {
